@@ -22,6 +22,9 @@ class Kohana_Database_MySQL extends Database {
 	// MySQL uses a backtick for identifiers
 	protected $_identifier = '`';
 
+	// Is in a transaction
+	protected $_in_transaction = false;
+
 	public function connect()
 	{
 		if ($this->_connection)
@@ -269,13 +272,19 @@ class Kohana_Database_MySQL extends Database {
 		// Make sure the database is connected
 		$this->_connection or $this->connect();
 
-		if ($mode AND ! mysql_query("SET TRANSACTION ISOLATION LEVEL $mode", $this->_connection))
+		if(!$this->_in_transaction)
 		{
-			throw new Database_Exception(':error', array(':error' => mysql_error($this->_connection)),
-										 mysql_errno($this->_connection));
-		}
+			if ($mode AND ! mysql_query("SET TRANSACTION ISOLATION LEVEL $mode", $this->_connection))
+			{
+				throw new Database_Exception(':error', array(':error' => mysql_error($this->_connection)),
+											 mysql_errno($this->_connection));
+			}
+		
+			mysql_query('SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, AUTOCOMMIT=0;', $this->_connection);
 
-		return (bool) mysql_query('START TRANSACTION', $this->_connection);
+			return (bool) mysql_query('START TRANSACTION', $this->_connection);
+		}
+		return true;
 	}
 
 	/**
@@ -289,7 +298,12 @@ class Kohana_Database_MySQL extends Database {
 		// Make sure the database is connected
 		$this->_connection or $this->connect();
 
-		return (bool) mysql_query('COMMIT', $this->_connection);
+		if(!(bool) mysql_query('COMMIT', $this->_connection))
+			return false;
+
+		$this->_in_transaction = false;
+		mysql_query('SET AUTOCOMMIT=@OLD_AUTOCOMMIT;', $this->_connection);
+		return true;
 	}
 
 	/**
@@ -303,7 +317,22 @@ class Kohana_Database_MySQL extends Database {
 		// Make sure the database is connected
 		$this->_connection or $this->connect();
 
-		return (bool) mysql_query('ROLLBACK', $this->_connection);
+		if(!(bool) mysql_query('ROLLBACK', $this->_connection))
+			return false;
+
+		$this->_in_transaction = false;
+		mysql_query('SET AUTOCOMMIT=@OLD_AUTOCOMMIT;', $this->_connection);
+		return true;
+	}
+
+	/**
+	 * Is this database connection in a transaction
+	 * 
+	 * @return boolean
+	 */
+	public function inTransaction ()
+	{
+		return $this->_in_transaction;
 	}
 
 	public function list_tables($like = NULL)
