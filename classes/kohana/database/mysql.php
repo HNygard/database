@@ -279,9 +279,8 @@ class Kohana_Database_MySQL extends Database {
 				throw new Database_Exception(':error', array(':error' => mysql_error($this->_connection)),
 											 mysql_errno($this->_connection));
 			}
-		
-			mysql_query('SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, AUTOCOMMIT=0;', $this->_connection);
-
+			
+			$this->_in_transaction = true;
 			return (bool) mysql_query('START TRANSACTION', $this->_connection);
 		}
 		return true;
@@ -302,7 +301,6 @@ class Kohana_Database_MySQL extends Database {
 			return false;
 
 		$this->_in_transaction = false;
-		mysql_query('SET AUTOCOMMIT=@OLD_AUTOCOMMIT;', $this->_connection);
 		return true;
 	}
 
@@ -321,7 +319,6 @@ class Kohana_Database_MySQL extends Database {
 			return false;
 
 		$this->_in_transaction = false;
-		mysql_query('SET AUTOCOMMIT=@OLD_AUTOCOMMIT;', $this->_connection);
 		return true;
 	}
 
